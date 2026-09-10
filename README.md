@@ -6,22 +6,28 @@ Provides camera access via Python OpenCV through the Model Context Protocol.
 
 ### pip
 ```
-pip install opencv-python mcp
+pip install mcp-cam
 ```
 
 ### uv
 ```
-uv add opencv-python mcp
+uv pip install mcp-cam
 ```
 
 ### uvx
 ```
-uvx --from mcp-cam mcp-cam
+uvx mcp-cam
 ```
 
 ## Run
 ```
 python mcp-cam/server.py
+```
+
+or
+
+```
+uvx mcp-cam
 ```
 
 ## OpenCode Config (`opencode.jsonc`)

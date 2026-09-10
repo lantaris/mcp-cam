@@ -36,7 +36,7 @@ uvx mcp-cam
   "mcp": {
     "mcp-cam": {
       "type": "local",
-      "command": ["python", "mcp-cam/server.py"],
+      "command": ["uvx", "mcp-cam"],
       "cwd": ".",
       "enabled": true
     }

@@ -10,3 +10,5 @@ build/
 venv/
 .idea/
 .vscode/
+test_capture.jpg
+*.jpg

@@ -97,7 +97,7 @@ async def capture_jpg(device_index: int = None, flip: bool = False, quality: int
 
 @mcp.tool(
     description=(
-        "Capture one frame from a camera and return native Image. Params: device_index (int, optional, defaults to first device from list_devices), flip (bool, default False — flip horizontally), quality (int, default 95 — JPEG image quality). Auto-adjusts brightness if dark. Returns: Image or raises error."
+        "Capture one frame from a camera and return native Image — native screenshot for agent directly visible in chat. Params: device_index (int, optional, defaults to first device from list_devices), flip (bool, default False — flip horizontally), quality (int, default 95 — JPEG image quality). Auto-adjusts brightness if dark. Returns: Image or raises error."
     )
 )
 async def capture_image(device_index: int = None, flip: bool = False, quality: int = 95) -> Image:

@@ -112,10 +112,10 @@ async def capture_image(device_index: int = None, flip: bool = False, quality: i
 
 @mcp.tool(
     description=(
-        "Get video properties (width, height, fps, brightness, contrast, saturation). Params: index (int, optional, defaults to first device from list_devices). Returns: properties dict string or error message."
+        "Get camera properties (width, height, fps, brightness, contrast, saturation). Params: index (int, optional, defaults to first device from list_devices). Returns: properties dict string or error message."
     )
 )
-async def get_video_properties(index: int = None) -> str:
+async def get_camera_properties(index: int = None) -> str:
     if index is None:
         devices = await list_devices()
         index = devices[0]["index"] if devices and "index" in devices[0] else 0
@@ -138,10 +138,10 @@ async def get_video_properties(index: int = None) -> str:
 
 @mcp.tool(
     description=(
-        "Set video property (width/height/brightness/contrast/saturation). Params: index (int, optional, defaults to first device from list_devices), property_name (str, default 'brightness'), value (float, default 0). Returns: confirmation with new value and success flag, or error message."
+        "Set camera property (width/height/brightness/contrast/saturation). Params: index (int, optional, defaults to first device from list_devices), property_name (str, default 'brightness'), value (float, default 0). Returns: confirmation with new value and success flag, or error message."
     )
 )
-async def set_video_property(index: int = None, property_name: str = "brightness", value: float = 0) -> str:
+async def set_camera_property(index: int = None, property_name: str = "brightness", value: float = 0) -> str:
     if index is None:
         devices = await list_devices()
         index = devices[0]["index"] if devices and "index" in devices[0] else 0

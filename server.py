@@ -8,15 +8,9 @@ from uuid import uuid4
 
 import cv2
 import numpy as np
-from fastmcp import FastMCP
-from fastmcp.utilities.types import Image
-
-
-def _device_index_from_id(connection_id: str) -> int:
-    try:
-        return int(connection_id.split("_")[-1])
-    except (ValueError, IndexError):
-        return 0
+from cv2_enumerate_cameras import enumerate_cameras
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.utilities.types import Image
 
 
 def _capture_frame(cap: cv2.VideoCapture, flip: bool = False) -> Optional[np.ndarray]:
@@ -37,18 +31,13 @@ def _capture_frame(cap: cv2.VideoCapture, flip: bool = False) -> Optional[np.nda
 
 
 def _capture_by_device_index(device_index: int, flip: bool = False) -> Optional[np.ndarray]:
-    cap = cv2.VideoCapture(device_index, cv2.CAP_DSHOW)
+    cap = cv2.VideoCapture(device_index)
     if not cap.isOpened():
         return None
     try:
         return _capture_frame(cap, flip)
     finally:
         cap.release()
-
-
-def _capture_by_connection_id(connection_id: str, flip: bool = False) -> Optional[np.ndarray]:
-    device_index = _device_index_from_id(connection_id)
-    return _capture_by_device_index(device_index, flip)
 
 
 def _frame_to_base64(frame: np.ndarray, quality: int = 95) -> str:
@@ -70,22 +59,18 @@ def _resolve_save_path(save_path: Optional[str]) -> str:
     return os.path.join(tempfile.gettempdir(), f"capture_{uuid4().hex}.jpg")
 
 
-mcp = FastMCP("mcp-cam")
+mcp = MCPServer("mcp-cam")
 
 
 @mcp.tool(
     description=(
-        "Capture a single frame from the camera by device index and return it as "
-        "a base64-encoded JPEG image prefixed with 'IMAGE_BASE64:'. "
-        "Uses DirectShow backend (cv2.CAP_DSHOW). "
-        "Automatically adjusts brightness if the frame is too dark. "
-        "Optionally applies horizontal flip (flip=True). "
-        "JPEG quality can be set via quality parameter (1-100, default 95). "
-        "Returns a string starting with 'IMAGE_BASE64:' followed by base64 data, "
-        "or an error message if the camera cannot be opened or the frame cannot be read."
+        "Capture one frame from a camera and return base64 string. Params: device_index (int, optional, defaults to first device from list_devices), flip (bool, default False — flip horizontally), quality (int, default 95 — JPEG image quality). Auto-adjusts brightness if dark. Returns: IMAGE_BASE64:... JPEG string or error message."
     )
 )
-async def capture_base64(device_index: int = 0, flip: bool = False, quality: int = 95) -> str:
+async def capture_base64(device_index: int = None, flip: bool = False, quality: int = 95) -> str:
+    if device_index is None:
+        devices = await list_devices()
+        device_index = devices[0]["index"] if devices and "index" in devices[0] else 0
     frame = _capture_by_device_index(device_index, flip)
     if frame is None:
         return f"ERROR: Cannot open camera device {device_index}"
@@ -94,17 +79,13 @@ async def capture_base64(device_index: int = 0, flip: bool = False, quality: int
 
 @mcp.tool(
     description=(
-        "Capture a single frame from the camera by device index and save it as a JPEG file. "
-        "Uses DirectShow backend (cv2.CAP_DSHOW). "
-        "Automatically adjusts brightness if the frame is too dark. "
-        "Optionally applies horizontal flip (flip=True). "
-        "JPEG quality can be set via quality parameter (1-100, default 95). "
-        "If save_path is omitted, the file is saved to the system temporary directory "
-        "with a random filename. "
-        "Returns the path of the saved file on success, or an error message on failure."
+        "Capture one frame from a camera and save as JPEG file. Params: device_index (int, optional, defaults to first device from list_devices), flip (bool, default False — flip horizontally), quality (int, default 95 — JPEG image quality), save_path (str, optional — temporary path if omitted). Auto-adjusts brightness if dark. Returns: saved file path or error message."
     )
 )
-async def capture_jpg(device_index: int = 0, flip: bool = False, quality: int = 95, save_path: Optional[str] = None) -> str:
+async def capture_jpg(device_index: int = None, flip: bool = False, quality: int = 95, save_path: Optional[str] = None) -> str:
+    if device_index is None:
+        devices = await list_devices()
+        device_index = devices[0]["index"] if devices and "index" in devices[0] else 0
     frame = _capture_by_device_index(device_index, flip)
     if frame is None:
         return f"ERROR: Cannot open camera device {device_index}"
@@ -116,17 +97,13 @@ async def capture_jpg(device_index: int = 0, flip: bool = False, quality: int = 
 
 @mcp.tool(
     description=(
-        "Capture a single frame from the camera by device index and return it as "
-        "a native FastMCP Image object. "
-        "Uses DirectShow backend (cv2.CAP_DSHOW). "
-        "Automatically adjusts brightness if the frame is too dark. "
-        "Optionally applies horizontal flip (flip=True). "
-        "JPEG quality can be set via quality parameter (1-100, default 95). "
-        "Returns an Image that MCP clients render natively, "
-        "or raises an error if the camera cannot be opened or the frame cannot be read."
+        "Capture one frame from a camera and return native Image. Params: device_index (int, optional, defaults to first device from list_devices), flip (bool, default False — flip horizontally), quality (int, default 95 — JPEG image quality). Auto-adjusts brightness if dark. Returns: Image or raises error."
     )
 )
-async def capture_image(device_index: int = 0, flip: bool = False, quality: int = 95) -> Image:
+async def capture_image(device_index: int = None, flip: bool = False, quality: int = 95) -> Image:
+    if device_index is None:
+        devices = await list_devices()
+        device_index = devices[0]["index"] if devices and "index" in devices[0] else 0
     frame = _capture_by_device_index(device_index, flip)
     if frame is None:
         raise RuntimeError(f"Cannot open camera device {device_index}")
@@ -135,84 +112,16 @@ async def capture_image(device_index: int = 0, flip: bool = False, quality: int 
 
 @mcp.tool(
     description=(
-        "Capture a single frame using an existing connection ID "
-        "(device index embedded in the ID, e.g., 'cam_2'). "
-        "Uses DirectShow backend (cv2.CAP_DSHOW). "
-        "Automatically adjusts brightness if the frame is too dark. "
-        "Optionally applies horizontal flip (flip=True). "
-        "JPEG quality can be set via quality parameter (1-100, default 95). "
-        "Returns a base64-encoded JPEG image prefixed with 'IMAGE_BASE64:', "
-        "or an error message if the camera is unavailable or the frame cannot be read."
+        "Get video properties (width, height, fps, brightness, contrast, saturation). Params: index (int, optional, defaults to first device from list_devices). Returns: properties dict string or error message."
     )
 )
-async def capture_frame_base64(connection_id: str, flip: bool = False, quality: int = 95) -> str:
-    frame = _capture_by_connection_id(connection_id, flip)
-    if frame is None:
-        device_index = _device_index_from_id(connection_id)
-        return f"ERROR: Cannot open camera device {device_index}"
-    return _frame_to_base64(frame, quality)
-
-
-@mcp.tool(
-    description=(
-        "Capture a single frame using an existing connection ID "
-        "(device index embedded in the ID, e.g., 'cam_2'). "
-        "Uses DirectShow backend (cv2.CAP_DSHOW). "
-        "Automatically adjusts brightness if the frame is too dark. "
-        "Optionally applies horizontal flip (flip=True). "
-        "JPEG quality can be set via quality parameter (1-100, default 95). "
-        "Saves the frame as a JPEG file. "
-        "If save_path is omitted, the file is saved to the system temporary directory "
-        "with a random filename. "
-        "Returns the path of the saved file on success, or an error message on failure."
-    )
-)
-async def capture_frame_jpg(connection_id: str, flip: bool = False, quality: int = 95, save_path: Optional[str] = None) -> str:
-    frame = _capture_by_connection_id(connection_id, flip)
-    if frame is None:
-        device_index = _device_index_from_id(connection_id)
-        return f"ERROR: Cannot open camera device {device_index}"
-    path = _resolve_save_path(save_path)
-    encode_params = [cv2.IMWRITE_JPEG_QUALITY, quality]
-    cv2.imwrite(path, frame, encode_params)
-    return f"OK: saved to {path}"
-
-
-@mcp.tool(
-    description=(
-        "Capture a single frame using an existing connection ID "
-        "(device index embedded in the ID, e.g., 'cam_2'). "
-        "Uses DirectShow backend (cv2.CAP_DSHOW). "
-        "Automatically adjusts brightness if the frame is too dark. "
-        "Optionally applies horizontal flip (flip=True). "
-        "JPEG quality can be set via quality parameter (1-100, default 95). "
-        "Returns a native FastMCP Image that MCP clients render natively, "
-        "or raises an error if the camera is unavailable or the frame cannot be read."
-    )
-)
-async def capture_frame_image(connection_id: str, flip: bool = False, quality: int = 95) -> Image:
-    frame = _capture_by_connection_id(connection_id, flip)
-    if frame is None:
-        device_index = _device_index_from_id(connection_id)
-        raise RuntimeError(f"Cannot open camera device {device_index}")
-    return _frame_to_image(frame, quality)
-
-
-@mcp.tool(
-    description=(
-        "Get video properties (width, height, fps, brightness, contrast, saturation) "
-        "for a camera identified by connection ID. "
-        "Connects to the device using DirectShow, reads the properties, "
-        "then releases the camera. "
-        "Returns a dictionary string (e.g., {'width': 640, ...}) "
-        "or an error message if the device cannot be opened."
-    )
-)
-async def get_video_properties(connection_id: str) -> str:
-    device_index = _device_index_from_id(connection_id)
-    cap = cv2.VideoCapture(device_index, cv2.CAP_DSHOW)
+async def get_video_properties(index: int = None) -> str:
+    if index is None:
+        devices = await list_devices()
+        index = devices[0]["index"] if devices and "index" in devices[0] else 0
+    cap = cv2.VideoCapture(index)
     if not cap.isOpened():
-        return f"ERROR: Cannot open camera device {device_index}"
+        return f"ERROR: Cannot open camera device {index}"
     try:
         props = {
             "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
@@ -229,19 +138,16 @@ async def get_video_properties(connection_id: str) -> str:
 
 @mcp.tool(
     description=(
-        "Set a video property (width, height, brightness, contrast, or saturation) "
-        "for a camera identified by connection ID. "
-        "The property name must match exactly (e.g., 'brightness'). "
-        "Applies the value via VideoCapture.set(), releases the device, "
-        "and returns a confirmation string with the new value and the backend success flag (True/False), "
-        "or an error if the property is unknown or the camera is unavailable."
+        "Set video property (width/height/brightness/contrast/saturation). Params: index (int, optional, defaults to first device from list_devices), property_name (str, default 'brightness'), value (float, default 0). Returns: confirmation with new value and success flag, or error message."
     )
 )
-async def set_video_property(connection_id: str, property_name: str, value: float) -> str:
-    device_index = _device_index_from_id(connection_id)
-    cap = cv2.VideoCapture(device_index, cv2.CAP_DSHOW)
+async def set_video_property(index: int = None, property_name: str = "brightness", value: float = 0) -> str:
+    if index is None:
+        devices = await list_devices()
+        index = devices[0]["index"] if devices and "index" in devices[0] else 0
+    cap = cv2.VideoCapture(index)
     if not cap.isOpened():
-        return f"ERROR: Cannot open camera device {device_index}"
+        return f"ERROR: Cannot open camera device {index}"
     prop_map = {
         "width": cv2.CAP_PROP_FRAME_WIDTH,
         "height": cv2.CAP_PROP_FRAME_HEIGHT,
@@ -257,6 +163,21 @@ async def set_video_property(connection_id: str, property_name: str, value: floa
         return f"OK: set {property_name} = {value} (success={bool(result)})"
     finally:
         cap.release()
+
+
+@mcp.tool(
+    description=(
+        "List available cameras: returns list of dicts with index and name."
+    )
+)
+async def list_devices() -> list:
+    result = []
+    try:
+        for cam in enumerate_cameras():
+            result.append({"index": cam.index, "name": cam.name})
+    except Exception as e:
+        return [{"error": str(e)}]
+    return result
 
 
 def main():

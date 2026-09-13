@@ -1,7 +1,7 @@
 # Specification — mcp-cam
 
 ## Protocol
-- MCP (Model Context Protocol) via `mcp` Python SDK (`FastMCP`).
+- MCP (Model Context Protocol) via `mcp` Python SDK (`MCPServer`).
 - Transport: stdio (local process spawned by OpenCode).
 - Backend: DirectShow (`cv2.CAP_DSHOW`) for Windows camera access.
 
@@ -12,24 +12,23 @@
 - All capture functions support `flip` and `quality` parameters.
 
 ## Tools
-- `capture_base64`: single-shot camera capture by device index. Returns base64 JPEG string (`IMAGE_BASE64:...`).
-- `capture_image`: single-shot camera capture by device index. Returns native FastMCP `Image`.
-- `capture_jpg`: single-shot camera capture by device index. Saves JPEG file (`quality` controls compression, default 95).
-- `capture_frame_base64`: capture using existing connection ID. Returns base64 JPEG string.
-- `capture_frame_image`: capture using existing connection ID. Returns native FastMCP `Image`.
-- `capture_frame_jpg`: capture using existing connection ID. Saves JPEG file.
-- `get_video_properties`: read width, height, fps, brightness, contrast, saturation by connection ID.
-- `set_video_property`: set width, height, brightness, contrast, or saturation by connection ID.
+- `list_devices`: list all available cameras with their `index` and `name`.
+- `capture_base64`: single-shot camera capture by device index. Returns base64 JPEG string (`IMAGE_BASE64:...`). If `device_index` is not specified, the first camera from `list_devices` is used.
+- `capture_image`: single-shot camera capture by device index. Returns native `Image`. If `device_index` is not specified, the first camera from `list_devices` is used.
+- `capture_jpg`: single-shot camera capture by device index. Saves JPEG file (`quality` controls compression, default 95). If `device_index` is not specified, the first camera from `list_devices` is used.
+- `get_video_properties`: read width, height, fps, brightness, contrast, saturation by index. If `index` is not specified, the first camera from `list_devices` is used.
+- `set_video_property`: set width, height, brightness, contrast, or saturation by index. If `index` is not specified, the first camera from `list_devices` is used.
 
 ## Parameters
-- `device_index`: camera index (default 0).
-- `connection_id`: string like `cam_2` (device index embedded).
+- `device_index` / `index`: camera index (default: first camera from `list_devices`).
 - `flip`: horizontal flip (default False).
 - `quality`: JPEG quality 1-100 (default 95).
 - `save_path`: optional file path; defaults to system temp directory with random UUID filename.
+- `property_name`: exact property name (`width`, `height`, `brightness`, `contrast`, `saturation`).
 
 ## Dependencies
 - Python 3.10+
 - `opencv-python`
+- `numpy`
 - `mcp` (Python SDK)
-- `fastmcp` (FastMCP framework)
+- `cv2-enumerate-cameras`
